@@ -1,3 +1,4 @@
+import "isomorphic-fetch"; // enables calling fetch from server
 import express from "express";
 import React from "react";
 import { renderToString } from "react-dom/server";
@@ -6,6 +7,7 @@ import App from "./src/App";
 import path from "path";
 import fs from "fs";
 import { ServerStyleSheet } from "styled-components";
+import { InitialDataContext } from "./src/InitialDataContext";
 
 global.window = {};
 
@@ -25,17 +27,31 @@ app.get("/api/articles", (req, res) => {
   res.json(loadedArticles);
 });
 
-app.get("/*", (req, res) => {
+app.get("/*", async (req, res) => {
   const sheet = new ServerStyleSheet();
 
-  const loadedArticles = articles; // like a db query
+  const contextObj = { _isServerSide: true, _requests: [], _data: {} };
+
+  renderToString(
+    sheet.collectStyles(
+      <InitialDataContext.Provider value={contextObj}>
+        <StaticRouter location={req.url}>
+          <App />
+        </StaticRouter>
+      </InitialDataContext.Provider>
+    )
+  );
+
+  await Promise.all(contextObj._requests);
+  contextObj._isServerSide = false;
+  delete contextObj._requests;
 
   const reactApp = renderToString(
-    sheet.collectStyles(
+    <InitialDataContext.Provider value={contextObj}>
       <StaticRouter location={req.url}>
         <App />
       </StaticRouter>
-    )
+    </InitialDataContext.Provider>
   );
 
   const templateFile = path.resolve("./build/index.html");
@@ -48,8 +64,8 @@ app.get("/*", (req, res) => {
       data
         .replace(
           '<div id="root"></div>',
-          `<script>window.preloadedArticles = ${JSON.stringify(
-            loadedArticles
+          `<script>window.preloadedData = ${JSON.stringify(
+            contextObj
           )}</script>;<div id="root">${reactApp}</div>`
         )
         .replace("<style id='style-root'></style>", sheet.getStyleTags())
