@@ -1,5 +1,11 @@
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import { useDataSSR } from "../useDataSSR";
+import { ErrorBoundary } from "../components/ErrorBoundary";
+
+const One = lazy(() => import("../components/One"));
+const Two = lazy(() => import("../components/Two"));
+const Three = lazy(() => import("../components/Three"));
+
 export const Articles = () => {
   const fetchArticles = () => {
     console.log("no preloaded articles found - loading from server");
@@ -20,6 +26,14 @@ export const Articles = () => {
             <p>{article.author}</p>
           </div>
         ))}
+
+      <ErrorBoundary>
+        <Suspense fallback={<span>Loading...</span>}>
+          <One />
+          <Two />
+          <Three />
+        </Suspense>
+      </ErrorBoundary>
     </>
   );
 };
